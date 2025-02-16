@@ -17,7 +17,6 @@ const uploadOnCloudinary = async (localFilePath) => {
     try {
         if (!localFilePath) {
             throw new ApiError(400 , "local path not present")
-            return null
         }
         //upload the file on cloudinary
         const response = await cloudinary.uploader.upload(localFilePath, {

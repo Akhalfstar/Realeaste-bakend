@@ -1,6 +1,12 @@
 import mongoose, { Schema } from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { configDotenv } from "dotenv";
+import { ApiError } from "../utiles/ApiError.js";
+
+configDotenv();
+
+
 
 const UserModel = new Schema(
   {
@@ -56,31 +62,39 @@ UserModel.methods.isPasswordCorrect = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
 
-UserModel.method.generateAccessToken = function () {
-  jwt.sign(
-    {
-      _id: this._id,
-      email: this.email,
-      username: this.username,
-      fullName: this.fullName,
-    },
-    process.env.ACCESS_TOKEN_SECRET,
-    {
-      expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
-    }
-  );
+UserModel.methods.generateAccessToken = function () {
+  try {
+    jwt.sign(
+      {
+        _id: this._id,
+        email: this.email,
+        username: this.username,
+        fullName: this.fullName,
+      },
+      process.env.ACCESS_TOKEN_SECRET,
+      {
+        expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+      }
+    );
+  } catch (error) {
+    throw new ApiError(400 , "Access token genration failed : ", error)
+  }
 };
 
-UserModel.method.generateRefreshToken = function () {
-  jwt.sign(
-    {
-      _id: this._id,
-    },
-    process.env.ACCESS_TOKEN_SECRET,
-    {
-      expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
-    }
-  );
+UserModel.methods.generateRefreshToken = function () {
+  try {
+    jwt.sign(
+      {
+        _id: this._id,
+      },
+      process.env.ACCESS_TOKEN_SECRET,
+      {
+        expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+      }
+    );
+  } catch (error) {
+    throw new ApiError(400 , "refresh token genration failed")
+  }
 };
 
 export const user = mongoose.model("user", UserModel);
