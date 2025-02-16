@@ -1,8 +1,8 @@
-import { configDotenv } from 'dotenv';
+import dotenv from 'dotenv';
 import ConnetDB from './db/db.js';
 import { app } from './App.js';
 
-configDotenv({ path: './.env' });
+dotenv.config();
 
 const port = process.env.PORT || 3000;
 
