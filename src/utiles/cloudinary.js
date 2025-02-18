@@ -29,10 +29,17 @@ const uploadOnCloudinary = async (localFilePath) => {
 
     } catch (error) {
         fs.unlinkSync(localFilePath) // remove the locally saved temporary file as the upload operation got failed
-        return null;
+        throw new ApiError(500 , " file not uploaded ");
     }
 }
 
+const deleteFromCloudnary = ( async (publicId) => {
+    try {
+        await cloudinary.uploader.destroy(publicId);
+    } catch (error) {
+        throw new ApiError(500 , "Server Error Image not deleted " , error);
+    }
+})
 
 
-export {uploadOnCloudinary}
+export {uploadOnCloudinary , deleteFromCloudnary}
