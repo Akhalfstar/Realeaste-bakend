@@ -34,21 +34,19 @@ const registerUser = asyncHandler(async (req, res) => {
   // check for user creation
   // return res
 
-  const { fullName, email, username, password } = req.body;
+  const { fullName, email, password , role } = req.body;
   // console.log("email: ", email);
 
   if (
-    [fullName, email, username, password].some((field) => field?.trim() === "")
+    [fullName, email, password , role].some((field) => field?.trim() === "")
   ) {
     throw new ApiError(400, "All fields are required");
   }
 
-  const existedUser = await User.findOne({
-    $or: [{ username }, { email }],
-  });
+  const existedUser = await User.findOne({email});
 
   if (existedUser) {
-    throw new ApiError(409, "User with email or username already exists");
+    throw new ApiError(409, "User with email already exists");
   }
 //   console.log(req.files);
 
@@ -63,32 +61,19 @@ const registerUser = asyncHandler(async (req, res) => {
   console.log(avatarLocalPath);
   //const coverImageLocalPath = req.files?.coverImage[0]?.path;
 
-  let coverImageLocalPath;
-  if (
-    req.files &&
-    Array.isArray(req.files.coverImage) &&
-    req.files.coverImage.length > 0
-  ) {
-    coverImageLocalPath = req.files.coverImage[0].path;
-  }
 
   let avatar;
-  if(coverImageLocalPath){
+  if(avatarLocalPath){
     avatar = await uploadOnCloudinary(avatarLocalPath);
   }
     
-  let coverImage;
-  if(coverImageLocalPath){
-    coverImage = await uploadOnCloudinary(coverImageLocalPath);
-  }
 
   const user = await User.create({
     fullName,
     avatar: avatar?.url || "",
-    coverImage: coverImage?.url || "",
     email,
     password,
-    username: username.toLowerCase(),
+    role,
   });
 
   const createdUser = await User.findById(user._id).select(
@@ -120,11 +105,11 @@ const loginUser = asyncHandler(async (req, res) => {
   //password check
   //access and referesh token
   //send cookie
-  const { email, username, password } = req.body;
+  const { email,  password } = req.body;
   // console.log(email);
 
-  if (!username && !email) {
-    throw new ApiError(400, "username or email is required");
+  if (!email) {
+    throw new ApiError(400, " email is required");
   }
 
   // if (!(username || email)) {
@@ -132,9 +117,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
   // }
 
-  const user = await User.findOne({
-    $or: [{ username }, { email }],
-  });
+  const user = await User.findOne({email});
 
   if (!user) {
     throw new ApiError(404, "User does not exist");
@@ -146,9 +129,7 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid user credentials");
   }
 
-  const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
-    user._id
-  );
+  const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(user._id);
 
   const loggedInUser = await User.findById(user._id).select(
     "-password -refreshToken"

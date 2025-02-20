@@ -6,18 +6,8 @@ import { ApiError } from "../utiles/ApiError.js";
 
 configDotenv();
 
-
-
 const UserModel = new Schema(
   {
-    username: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-      index: true,
-    },
     email: {
       type: String,
       required: true,
@@ -25,6 +15,17 @@ const UserModel = new Schema(
       lowecase: true,
       trim: true,
     },
+    role: {
+      type: String,
+      enum: ["user", "agent", "admin"],
+      default: "user",
+    },
+    favorites: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Property",
+      },
+    ],
     fullName: {
       type: String,
       required: true,
@@ -32,9 +33,6 @@ const UserModel = new Schema(
       index: true,
     },
     avatar: {
-      type: String, // cloudinary url
-    },
-    coverImage: {
       type: String, // cloudinary url
     },
     password: {
@@ -63,11 +61,10 @@ UserModel.methods.isPasswordCorrect = async function (password) {
 
 UserModel.methods.generateAccessToken = function () {
   try {
-    jwt.sign(
+    return jwt.sign(
       {
         _id: this._id,
         email: this.email,
-        username: this.username,
         fullName: this.fullName,
       },
       process.env.ACCESS_TOKEN_SECRET,
@@ -76,13 +73,13 @@ UserModel.methods.generateAccessToken = function () {
       }
     );
   } catch (error) {
-    throw new ApiError(400 , "Access token genration failed : ", error)
+    throw new ApiError(400, "Access token genration failed : ", error);
   }
 };
 
 UserModel.methods.generateRefreshToken = function () {
   try {
-    jwt.sign(
+    return jwt.sign(
       {
         _id: this._id,
       },
@@ -92,7 +89,7 @@ UserModel.methods.generateRefreshToken = function () {
       }
     );
   } catch (error) {
-    throw new ApiError(400 , "refresh token genration failed")
+    throw new ApiError(400, "refresh token genration failed");
   }
 };
 
