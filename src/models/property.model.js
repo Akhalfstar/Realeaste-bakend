@@ -23,9 +23,11 @@ const PropertySchema = new mongoose.Schema({
     type: {
       type: String,
       enum: ['Point'],
+      default : 'Point',
     },
     coordinates: {
       type: [Number], // [longitude, latitude]
+      required : true,
     },
   },
   price: {
@@ -34,7 +36,7 @@ const PropertySchema = new mongoose.Schema({
   },
   propertyType: {
     type: String,
-    enum: ['house', 'apartment', 'condo', 'land', 'commercial'],
+    enum: ['house', 'apartment',  'commercial'],
     required: true,
   },
   status: {
@@ -62,13 +64,20 @@ const PropertySchema = new mongoose.Schema({
       type: String,
     },
   ],
+  amenities: [
+    {
+      name : String,
+      distance : Number,
+    },
+  ],
+
   createdAt: {
     type: Date,
     default: Date.now,
   },
   agent: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'user',
     required: true,
   },
 });
@@ -77,4 +86,4 @@ PropertySchema.index({ location: '2dsphere' }); // For geospatial queries
 
 
 
-export const Property = mongoose.model('Property', PropertySchema);
+export const Property = mongoose.model('property', PropertySchema);

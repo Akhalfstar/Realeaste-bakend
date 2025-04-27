@@ -15,18 +15,23 @@ const UserModel = new Schema(
       lowecase: true,
       trim: true,
     },
+    phone: {
+      type: String,
+      required: true,
+      unique: true,
+    },
     role: {
       type: String,
       enum: ["user", "agent", "admin"],
       default: "user",
     },
-    favorites: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Property",
-      },
-    ],
     fullName: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
+    },
+    location: {
       type: String,
       required: true,
       trim: true,

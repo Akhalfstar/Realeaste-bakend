@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { upload } from "../middlewares/multer.middleware.js";
-import { createProperty, deleteProperty, getAllProperties, getNearbyProperties, getPropertyById, getPropertyStats, updateProperty } from "../controller/property.controller.js";
+import { createProperty, deleteProperty, getAllProperties, getNearbyProperties, getPropertyById, getPropertyStats, getUserProperties, updateProperty } from "../controller/property.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 
@@ -26,7 +26,7 @@ propertyRouter.route("/update").post(
     verifyJWT , 
     updateProperty
 )
-
+propertyRouter.route("/userproperties").get(verifyJWT , getUserProperties)
 propertyRouter.route("/deleteOne").post(verifyJWT , deleteProperty)
 propertyRouter.route("/searchNear").get(getNearbyProperties)
 propertyRouter.route("/propertyStatus").get(getPropertyStats)

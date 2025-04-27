@@ -5,28 +5,34 @@ import { ApiError } from '../utiles/ApiError.js';
 import { asyncHandler } from '../utiles/asyncHandler.js';
 import { uploadOnCloudinary } from '../utiles/cloudinary.js';
 
+
 const createProperty = asyncHandler(async (req, res) => {
     try {
-        if(req.user.role === "user"){
-            throw new ApiError(401 , "Unauthorized request by user ")
+        if (req.user.role === "user") {
+            throw new ApiError(401, "Unauthorized request by user");
         }
-        // 1. Extract property details from request body
+
+        // 1. Parse the propertyData JSON
+        const propertyData = JSON.parse(req.body.propertyData);
+
         const {
             title,
             description,
             address,
-            coordinates, // [longitude, latitude]
             price,
             propertyType,
             status,
             bedrooms,
             bathrooms,
             area,
-            features
-        } = req.body;
+            features,
+            latitude,
+            longitude,
+            amenities
+        } = propertyData;
 
         // 2. Basic validation
-        if (!title || !price || !propertyType || !status) {
+        if (!title || !price || !propertyType) {
             throw new ApiError(400, "Title, price, and property type are required");
         }
 
@@ -36,8 +42,7 @@ const createProperty = asyncHandler(async (req, res) => {
             throw new ApiError(400, "At least one property image is required");
         }
 
-        // 4. Upload images to Cloudinary
-        const imageUploadPromises = imageFiles.map(image => 
+        const imageUploadPromises = (Array.isArray(imageFiles) ? imageFiles : [imageFiles]).map(image =>
             uploadOnCloudinary(image.path)
         );
 
@@ -47,13 +52,13 @@ const createProperty = asyncHandler(async (req, res) => {
             url: img.secure_url
         }));
 
-        // 5. Prepare location data
-        const location = coordinates ? {
+        // 4. Prepare location
+        const location = (latitude !== null && longitude !== null) ? {
             type: 'Point',
-            coordinates: coordinates.split(',').map(coord => parseFloat(coord.trim()))
+            coordinates: [longitude, latitude]
         } : undefined;
 
-        // 6. Create property
+        // 5. Create property
         const property = await Property.create({
             title,
             description,
@@ -65,18 +70,19 @@ const createProperty = asyncHandler(async (req, res) => {
                 country: address?.country
             },
             location,
-            price: Number(price),
+            price,
             propertyType,
             status: status || 'available',
-            bedrooms: Number(bedrooms) || 0,
-            bathrooms: Number(bathrooms) || 0,
-            area: Number(area),
+            bedrooms,
+            bathrooms,
+            area,
             images: imagesData,
-            features: features ? JSON.parse(features) : [],
+            features,
+            amenities,
             agent: req.user._id
         });
 
-        // 7. Return response
+        // 6. Return response
         return res.status(201).json({
             success: true,
             message: "Property created successfully",
@@ -91,7 +97,23 @@ const createProperty = asyncHandler(async (req, res) => {
     }
 });
 
+
+
 const getAllProperties = asyncHandler(async (req, res) => {
+    console.log("get all property triggered");
+    const hasQueryParams = Object.keys(req.query).length > 0;
+
+    // Uncomment this to return all properties if no query parameters are present
+    // if (!hasQueryParams) {
+    //     console.log("No query");
+    //     const allProperties = await Property.find({});
+    //     return res.status(200).json({
+    //         success: true,
+    //         data: allProperties,
+    //         total: allProperties.length,
+    //     });
+    // }
+
     const {
         page = 1,
         limit = 10,
@@ -104,13 +126,17 @@ const getAllProperties = asyncHandler(async (req, res) => {
         state,
         minBedrooms,
         maxBedrooms,
-        nearLocation, // "latitude,longitude,distance(in meters)"
+        nearLocation,
     } = req.query;
 
     // Build filter object
     const filter = {};
     
-    if (propertyType) filter.propertyType = propertyType;
+    if (propertyType) {
+        // Allow filtering by multiple property types (comma-separated)
+        const propertyTypes = propertyType.split(',');
+        filter.propertyType = { $in: propertyTypes };
+    }
     if (status) filter.status = status;
     if (minPrice || maxPrice) {
         filter.price = {};
@@ -121,7 +147,14 @@ const getAllProperties = asyncHandler(async (req, res) => {
     if (state) filter['address.state'] = { $regex: state, $options: 'i' };
     if (minBedrooms) filter.bedrooms = { $gte: Number(minBedrooms) };
     if (maxBedrooms) filter.bedrooms = { ...filter.bedrooms, $lte: Number(maxBedrooms) };
-
+    if (req.query.bathrooms) {
+        filter.bathrooms = { $gte: Number(req.query.bathrooms) };
+      }
+      
+      // Modified bedrooms handling for simple "2+" style filter from frontend
+      if (req.query.bedrooms) {
+        filter.bedrooms = { $gte: Number(req.query.bedrooms) };
+      }
     // Handle geospatial query
     if (nearLocation) {
         const [lat, lng, distance] = nearLocation.split(',').map(Number);
@@ -129,10 +162,10 @@ const getAllProperties = asyncHandler(async (req, res) => {
             $near: {
                 $geometry: {
                     type: 'Point',
-                    coordinates: [lng, lat]
+                    coordinates: [lng, lat],
                 },
-                $maxDistance: distance || 10000 // Default 10km
-            }
+                $maxDistance: distance || 100000, // Default 100km
+            },
         };
     }
 
@@ -150,13 +183,14 @@ const getAllProperties = asyncHandler(async (req, res) => {
         pagination: {
             total,
             page: Number(page),
-            pages: Math.ceil(total / limit)
-        }
+            pages: Math.ceil(total / limit),
+        },
     });
 });
 
+
 const getPropertyById = asyncHandler(async (req, res) => {
-    const property = await Property.findById(req.params.id)
+    const property = await Property.findById(req.query._id)
         .populate('agent', 'name email phone');
 
     if (!property) {
@@ -295,6 +329,37 @@ const getPropertyStats = asyncHandler(async (req, res) => {
     });
 });
 
+const getUserProperties = asyncHandler(async (req, res) => {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        sort = '-createdAt'
+      } = req.query;
+  
+      const userId = req.user._id;
+      const skip = (page - 1) * limit;
+  
+      const properties = await Property.find({ agent: userId })
+        .sort(sort)
+        .skip(Number(skip))
+        .limit(Number(limit));
+  
+      const totalProperties = await Property.countDocuments({ agent: userId });
+  
+      return res.status(200).json({
+        success: true,
+        totalProperties,
+        currentPage: Number(page),
+        totalPages: Math.ceil(totalProperties / limit),
+        data: properties
+      });
+    } catch (error) {
+      throw new ApiError(500, "Could not get user properties: " + error);
+    }
+  });
+  
+
 export {
     createProperty,
     getAllProperties,
@@ -302,5 +367,6 @@ export {
     updateProperty,
     deleteProperty,
     getNearbyProperties,
-    getPropertyStats
+    getPropertyStats,
+    getUserProperties
 };
